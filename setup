@@ -1,0 +1,79 @@
+#!/bin/bash
+
+set -e
+set -u
+
+cd -P `dirname $0`
+
+DIR=`dirname \`pwd\``
+PARTITION=`df . | head -2 | tail -1 | cut -d ' ' -f 1`
+DEVICE=`echo ${PARTITION} | sed -r "s/[0-9]//g"`
+
+echo -n "The MBR of ${DEVICE} will be overwritten. Press ENTER to continue ou Ctrl+C to cancel... "
+read ANS
+
+echo "Ok, first create the lilo.conf file..."
+ANS="Y"
+if [ -e lilo.conf ]; then
+	ANS="N"
+	echo -n "Ops! There is already a lilo.conf. Overwrite it? [y/N] "
+	read ANS
+fi
+if [ "${ANS}" = "Y" -o "${ANS}" = "y" ]; then
+	cat << EOF >lilo.conf
+boot=${DEVICE}
+#append=" vt.default_utf8=0"
+bitmap = /boot/slack.bmp
+bmp-colors = 255,0,255,0,255,0
+bmp-table = 60,6,1,16
+bmp-timer = 65,27,0,255
+prompt
+timeout = 100
+compact
+lba32
+change-rules
+  reset
+vga = 773
+EOF
+	if [ -e ${DIR}/slackware64-current/kernels/huge.s/bzImage ]; then
+		cat << EOF >>lilo.conf
+image = ${DIR}/slackware64-current/kernels/huge.s/bzImage
+  initrd = ${DIR}/slackware64-current/isolinux/initrd.img
+  append = "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=huge.s"
+  label = "Slack64"
+EOF
+	fi
+	if [ -e ${DIR}/slackware-current/kernels/huge.s/bzImage ]; then
+		cat << EOF >>lilo.conf
+image = ${DIR}/slackware-current/kernels/huge.s/bzImage
+  initrd = ${DIR}/slackware-current/isolinux/initrd.img
+  append = "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=huge.s"
+  label = "Slack"
+EOF
+	fi
+	if [ -e ${DIR}/slackware-14.1/kernels/huge.s/bzImage ]; then
+		cat << EOF >>lilo.conf
+image = ${DIR}/slackware-14.1/kernels/huge.s/bzImage
+  initrd = ${DIR}/slackware-14.1/isolinux/initrd.img
+  append = "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=huge.s"
+  label = "Slack14.1"
+EOF
+	fi
+	if [ -e ${DIR}/slackware64-14.1/kernels/huge.s/bzImage ]; then
+		cat << EOF >>lilo.conf
+image = ${DIR}/slackware64-14.1/kernels/huge.s/bzImage
+  initrd = ${DIR}/slackware64-14.1/isolinux/initrd.img
+  append = "load_ramdisk=1 prompt_ramdisk=0 rw SLACK_KERNEL=huge.s"
+  label = "Slack64-14.1"
+EOF
+	fi
+fi
+
+echo "Sync discs..."
+sync
+
+echo "Running lilo. You may see some warnings. Don't worry."
+lilo -C lilo.conf -S /dev/null -m USB.map -b ${DEVICE}
+
+echo "Ok! Do you see any errors? If you don't then we are done!"
+
